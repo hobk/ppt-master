@@ -49,8 +49,6 @@ import SelectTemplate from './SelectTemplate.vue'
 import GeneratePpt from './GeneratePpt.vue'
 
 // ppt-master
-// 官网 https://docmee.cn
-// 开放平台 https://docmee.cn/open-platform/api#接口鉴权
 
 // api key
 const apiKey = '4u2Fo50Alk1ym2Os'
