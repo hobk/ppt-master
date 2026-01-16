@@ -81,7 +81,7 @@ function generatePptx(templateId: string, outline: string, dataUrl: string) {
     descTime.value = count
   }, 1000)
   gening.value = true
-  const url = 'https://docmee.cn/api/ppt/generateContent'
+  const url = 'https://ppt-master.yfw.me/api/ppt/generateContent'
   var source = new SSE(url, {
     method: 'POST',
     headers: {
@@ -127,7 +127,7 @@ function generatePptx(templateId: string, outline: string, dataUrl: string) {
 
 function asyncGenPptxInfo(id: string) {
   pptId.value = id
-  let url = `https://docmee.cn/api/ppt/asyncPptInfo?pptId=${id}`
+  let url = `https://ppt-master.yfw.me/api/ppt/asyncPptInfo?pptId=${id}`
   let xhr = new XMLHttpRequest()
   xhr.open('GET', url, true)
   xhr.setRequestHeader('token', props.token)
@@ -203,7 +203,7 @@ function drawPptx(idx: number) {
 }
 
 function downloadPptx() {
-  let url = 'https://docmee.cn/api/ppt/downloadPptx'
+  let url = 'https://ppt-master.yfw.me/api/ppt/downloadPptx'
   let xhr = new XMLHttpRequest()
   xhr.open('POST', url, true)
   xhr.setRequestHeader('token', props.token)
@@ -227,7 +227,7 @@ function downloadPptx() {
 function loadById(id: string) {
   gening.value = false
   pptId.value = id
-  let url = 'https://docmee.cn/api/ppt/loadPptx?id=' + id
+  let url = 'https://ppt-master.yfw.me/api/ppt/loadPptx?id=' + id
   let xhr = new XMLHttpRequest()
   xhr.open('GET', url, true)
   xhr.setRequestHeader('token', props.token)
