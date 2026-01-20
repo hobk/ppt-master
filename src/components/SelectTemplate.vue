@@ -47,7 +47,7 @@ const templateId = ref('')
 const $emit = defineEmits(['nextStep'])
 
 async function loadTemplates() {
-  const url = 'https://ppt-master.yfw.me/api/ppt/randomTemplates'
+  const url = 'https://ppt-master.yfw.me/api/public/ppt/randomTemplates'
   const resp = await (await fetch(url, {
     method: 'POST',
     headers: {
