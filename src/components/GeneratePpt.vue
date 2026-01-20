@@ -9,9 +9,18 @@
         </div>
       </div>
       <div class="ppt-actions">
-        <button v-if="!gening && pptId" class="button button--primary" @click="downloadPptx">下载PPTX</button>
+        <button v-if="!gening && pptId" class="button button--primary" :disabled="saving" @click="saveToCloud">
+          {{ saving ? '处理中...' : '存储到阿里云数据库' }}
+        </button>
       </div>
     </header>
+
+    <!-- 短链接展示区域 -->
+    <div v-if="shortLink" class="short-link-card reveal">
+      <div class="short-link-label">存储成功，短链接：</div>
+      <a :href="shortLink" target="_blank" class="short-link-url">{{ shortLink }}</a>
+      <button class="button button--secondary" @click="copyLink">复制链接</button>
+    </div>
 
     <div class="ppt-content reveal delay-1">
       <aside class="ppt-thumbs">
@@ -70,6 +79,8 @@ const pptId = ref('')
 const pages = ref([])
 const canvasList = ref([] as any)
 const currentIdx = ref(0)
+const shortLink = ref('')
+const saving = ref(false)
 
 var pptxObj = null as any
 var painter = null as any
@@ -221,6 +232,67 @@ function downloadPptx() {
   }
   xhr.onerror = function (e) {
     console.error(e)
+  }
+}
+
+async function saveToCloud() {
+  saving.value = true
+  shortLink.value = ''
+  
+  try {
+    // 第一步：获取文件下载链接
+    const fileUrl = await new Promise<string>((resolve, reject) => {
+      let url = 'https://ppt-master.yfw.me/api/ppt/downloadPptx?t=10086'
+      let xhr = new XMLHttpRequest()
+      xhr.open('POST', url, true)
+      xhr.setRequestHeader('token', props.token)
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      xhr.send(JSON.stringify({ id: pptId.value }))
+      xhr.onload = function () {
+        if (this.status === 200) {
+          let resp = JSON.parse(this.responseText)
+          resolve(resp.data.fileUrl)
+        } else {
+          reject(new Error('获取文件链接失败'))
+        }
+      }
+      xhr.onerror = function (e) {
+        reject(e)
+      }
+    })
+
+    // 第二步：调用短链接API存储到阿里云
+    const createShortLinkUrl = `https://short-captcha.9378ca78.er.aliyun-esa.net/create?url=${encodeURIComponent(fileUrl)}`
+    const response = await fetch(createShortLinkUrl)
+    const result = await response.json()
+    
+    if (result.success && result.shortLink) {
+      shortLink.value = result.shortLink
+    } else {
+      alert('存储失败：' + (result.error || '未知错误'))
+    }
+  } catch (e: any) {
+    console.error('存储失败', e)
+    alert('存储失败：' + (e.message || '网络错误'))
+  } finally {
+    saving.value = false
+  }
+}
+
+function copyLink() {
+  if (shortLink.value) {
+    navigator.clipboard.writeText(shortLink.value).then(() => {
+      alert('链接已复制到剪贴板')
+    }).catch(() => {
+      // 回退方案
+      const input = document.createElement('input')
+      input.value = shortLink.value
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      alert('链接已复制到剪贴板')
+    })
   }
 }
 
@@ -485,6 +557,66 @@ onMounted(() => {
 
   .ppt-preview {
     padding: 12px;
+  }
+}
+
+/* 短链接展示卡片样式 */
+.short-link-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(47, 154, 143, 0.1), rgba(106, 209, 190, 0.1));
+  border: 1px solid var(--accent-200);
+  box-shadow: var(--shadow-sm);
+}
+
+.short-link-label {
+  font-size: 14px;
+  color: var(--ink-600);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.short-link-url {
+  flex: 1;
+  font-size: 15px;
+  color: var(--accent-600);
+  font-weight: 600;
+  word-break: break-all;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.short-link-url:hover {
+  color: var(--accent-700);
+  text-decoration: underline;
+}
+
+.button--secondary {
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-600);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button--secondary:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-300);
+  color: var(--accent-600);
+}
+
+@media (max-width: 720px) {
+  .short-link-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 }
 </style>
