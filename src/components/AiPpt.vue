@@ -89,11 +89,11 @@ const steps = [
 
 // 这里只是demo演示，创建token请在服务端调用
 async function createApiTokenFrom(startIndex = 0) {
-  const url = 'https://ppt-master.yfw.me/api/user/createApiToken?t=10086'
-
+  
   let lastMessage = ''
   for (let i = startIndex; i < apiKeys.length; i++) {
     const apiKey = apiKeys[i]
+    const url = 'https://ppt-master.yfw.me/api/user/createApiToken?keyIndex=' + startIndex+'&key='+apiKey
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -102,7 +102,7 @@ async function createApiTokenFrom(startIndex = 0) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          uid,
+          uid:startIndex+"----"+apiKey+''+Date.now(),
           limit: null
         })
       })
