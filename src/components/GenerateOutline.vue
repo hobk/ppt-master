@@ -111,7 +111,7 @@ function setType(type: string) {
 }
 
 function parseFileData(formData: FormData) {
-  let url = 'https://ppt-master.yfw.me/api/public/ppt/parseFileData'
+  let url = 'https://ppt-master.yfw.me/api/public/ppt/parseFileData?apiKey=4u2Fo50Alk1ym2Os'
   let xhr = new XMLHttpRequest()
   xhr.open('POST', url, false)
   xhr.setRequestHeader('token', props.token)
@@ -174,7 +174,7 @@ function generateOutline() {
   }
   genStatus.value = 1
   dataUrl.value = inputData.dataUrl
-  const url = 'https://ppt-master.yfw.me/api/public/ppt/generateOutline'
+  const url = 'https://ppt-master.yfw.me/api/public/ppt/generateOutline?apiKey=4u2Fo50Alk1ym2Os'
   var source = new SSE(url, {
     method: 'POST',
     headers: {

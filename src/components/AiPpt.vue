@@ -69,7 +69,7 @@ const steps = [
 
 // 这里只是demo演示，创建token请在服务端调用
 async function createApiToken() {
-  const url = 'https://ppt-master.yfw.me/api/public/user/createApiToken'
+  const url = 'https://ppt-master.yfw.me/api/public/user/createApiToken?apiKey=4u2Fo50Alk1ym2Os'
   const resp = await (await fetch(url, {
     method: 'POST',
     headers: {
