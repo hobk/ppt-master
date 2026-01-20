@@ -24,8 +24,16 @@
     </header>
 
     <main class="shell__main">
+      <!-- 验证码弹窗容器 -->
+      <div id="captcha-element"></div>
       <div v-if="errorMessage" class="shell__error" role="alert">{{ errorMessage }}</div>
-      <GenerateOutline v-if="step === 1" :token="token" :refreshToken="refreshToken" @nextStep="handleOutline" />
+      <GenerateOutline 
+        v-if="step === 1" 
+        :token="token" 
+        :refreshToken="refreshToken" 
+        :triggerCaptcha="triggerCaptcha"
+        @nextStep="handleOutline" 
+      />
       <SelectTemplate v-if="step === 2" :token="token" @nextStep="selectTemplate" />
       <GeneratePpt
         v-if="step === 3"
@@ -44,10 +52,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect, onMounted } from 'vue'
 import GenerateOutline from './GenerateOutline.vue'
 import SelectTemplate from './SelectTemplate.vue'
 import GeneratePpt from './GeneratePpt.vue'
+
+// 声明全局 window 上的验证码初始化方法
+declare global {
+  interface Window {
+    initAliyunCaptcha: (config: any) => void
+  }
+}
+
+// 验证码实例
+let captchaInstance: any = null
+// 验证码验证参数（验证通过后获取）
+const captchaVerifyParam = ref('')
+const captchaVerified = ref(false)
 
 // ppt-master
 
@@ -143,10 +164,78 @@ watchEffect(() => {
   localStorage.setItem('token', token.value || '')
 })
 
+// 验证码通过后的回调函数
+let captchaSuccessCallback: (() => void) | null = null
+
+// 触发验证码的函数，供子组件调用
+function triggerCaptcha(onSuccess: () => void): boolean {
+  if (typeof window.initAliyunCaptcha !== 'function' || !captchaInstance) {
+    // SDK 未加载或实例未初始化，直接执行回调
+    console.warn('[Captcha] 验证码未就绪，跳过验证')
+    return false
+  }
+  captchaSuccessCallback = onSuccess
+  // 触发验证码弹窗
+  if (captchaInstance && typeof captchaInstance.show === 'function') {
+    captchaInstance.show()
+    return true
+  }
+  return false
+}
+
+// 初始化阿里云验证码
+function initCaptcha() {
+  // 页面加载时正常创建 token
   createApiTokenFrom(0).catch((e) => {
     console.error('[createApiToken] failed:', e)
     errorMessage.value = '服务端暂时不可用'
   })
+
+  if (typeof window.initAliyunCaptcha !== 'function') {
+    console.warn('[Captcha] 阿里云验证码 SDK 未加载')
+    return
+  }
+
+  window.initAliyunCaptcha({
+    SceneId: '1mnq9him', // 替换为你的实际场景ID
+    mode: 'popup', // 弹出式验证码
+    element: '#captcha-element', // 验证码容器
+    button: '#captcha-element', // 绑定到容器本身，通过 show() 手动触发
+    // 验证码验证通过回调
+    success: function (verifyParam: string) {
+      console.log('[Captcha] 验证通过')
+      captchaVerifyParam.value = verifyParam
+      captchaVerified.value = true
+      // 验证通过后执行回调
+      if (captchaSuccessCallback) {
+        captchaSuccessCallback()
+        captchaSuccessCallback = null
+      }
+    },
+    // 验证码验证失败回调
+    fail: function (result: any) {
+      console.error('[Captcha] 验证失败:', result)
+      errorMessage.value = '验证码验证失败，请重试'
+      captchaSuccessCallback = null
+    },
+    // 获取验证码实例
+    getInstance: function (instance: any) {
+      captchaInstance = instance
+    },
+    // 阿里云验证码服务域名
+    server: ['captcha-esa-open.aliyuncs.com', 'captcha-esa-open-b.aliyuncs.com'],
+    // 滑块样式配置
+    slideStyle: {
+      width: 360,
+      height: 40
+    }
+  })
+}
+
+// 页面加载完成后初始化验证码
+onMounted(() => {
+  initCaptcha()
+})
 
 </script>
 

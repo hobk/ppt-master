@@ -83,6 +83,7 @@ import { SSE } from '../utils/sse.js'
 const props = defineProps<{
   token: string
   refreshToken?: () => Promise<string>
+  triggerCaptcha?: (onSuccess: () => void) => boolean
 }>()
 
 const QUOTA_EXHAUSTED_MESSAGE = '会员'
@@ -203,6 +204,24 @@ async function generateOutline() {
   if (genStatus.value != 0) {
     return
   }
+  
+  // 尝试触发验证码
+  if (props.triggerCaptcha) {
+    const captchaTriggered = props.triggerCaptcha(() => {
+      // 验证通过后执行实际生成逻辑
+      doGenerateOutline()
+    })
+    if (captchaTriggered) {
+      // 验证码已触发，等待回调
+      return
+    }
+  }
+  
+  // 验证码未就绪或未配置，直接执行
+  doGenerateOutline()
+}
+
+async function doGenerateOutline() {
   genStatus.value = 1
   outlineHtml.value = '<h3>正在生成中，请稍后....</h3>'
   outline.value = ''
