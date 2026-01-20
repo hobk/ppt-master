@@ -93,7 +93,7 @@ async function createApiTokenFrom(startIndex = 0) {
   let lastMessage = ''
   for (let i = startIndex; i < apiKeys.length; i++) {
     const apiKey = apiKeys[i]
-    const url = 'https://ppt-master.yfw.me/api/user/createApiToken?keyIndex=' + startIndex+'&key='+apiKey
+    const url = 'https://ppt-master.yfw.me/api/user/createApiToken?keyIndex=' + startIndex+'&key='+apiKey.slice(-4)
     try {
       const response = await fetch(url, {
         method: 'POST',

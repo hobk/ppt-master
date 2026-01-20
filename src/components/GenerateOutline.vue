@@ -13,22 +13,22 @@
           <div class="field__label">输入方式</div>
           <div class="segmented">
             <button type="button" :class="{ 'is-active': selectType === 'subject' }" @click="setType('subject')">
-              主题
+              一句话主题
             </button>
             <button type="button" :class="{ 'is-active': selectType === 'text' }" @click="setType('text')">
-              文本
+              参考资料
             </button>
           </div>
         </div>
 
         <div v-if="selectType === 'subject'" class="field">
           <div class="field__label">主题</div>
-          <input v-model="subject" class="input" placeholder="例如：2024 产品发布会" maxlength="20" />
+          <input v-model="subject" class="input" placeholder="例如：阿里云安全指南" maxlength="20" />
         </div>
 
         <div v-else-if="selectType === 'text'" class="field">
-          <div class="field__label">内容</div>
-          <textarea v-model="text" class="textarea" placeholder="粘贴你的内容或大段描述" rows="6" maxlength="6000"></textarea>
+          <div class="field__label">参考资料</div>
+          <textarea v-model="text" class="textarea" placeholder="粘贴你的参考资料或大段描述，AI将帮助你生成大纲" rows="6" maxlength="6000"></textarea>
         </div>
 
         <div v-else class="field">
@@ -135,7 +135,7 @@ function parseFileData(formData: FormData) {
 }
 
 function streamGenerateOutline(inputData: any, token: string) {
-  const url = 'https://ppt-master.yfw.me/api/ppt/generateOutline?t=10086'
+  const url = 'https://ppt-master.yfw.me/api/ppt/generateOutline?p='+ encodeURIComponent(JSON.stringify(inputData))
   return new Promise<void>((resolve, reject) => {
     const source = new SSE(url, {
       method: 'POST',
