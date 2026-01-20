@@ -75,14 +75,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineEmits, nextTick } from 'vue'
+import { ref, nextTick } from 'vue'
 import OutlineEdit from './OutlineEdit.vue'
 import { marked } from 'marked'
 import { SSE } from '../utils/sse.js'
 
 const props = defineProps<{
   token: string
+  refreshToken?: () => Promise<string>
 }>()
+
+const QUOTA_EXHAUSTED_MESSAGE = '会员'
 
 const selectType = ref('subject')
 const subject = ref('')
@@ -111,7 +114,7 @@ function setType(type: string) {
 }
 
 function parseFileData(formData: FormData) {
-  let url = 'https://ppt-master.yfw.me/api/public/ppt/parseFileData?apiKey=4u2Fo50Alk1ym2Os'
+  let url = 'https://ppt-master.yfw.me/api/ppt/parseFileData?t=10086'
   let xhr = new XMLHttpRequest()
   xhr.open('POST', url, false)
   xhr.setRequestHeader('token', props.token)
@@ -131,12 +134,79 @@ function parseFileData(formData: FormData) {
   }
 }
 
-function generateOutline() {
+function streamGenerateOutline(inputData: any, token: string) {
+  const url = 'https://ppt-master.yfw.me/api/ppt/generateOutline?t=10086'
+  return new Promise<void>((resolve, reject) => {
+    const source = new SSE(url, {
+      method: 'POST',
+      headers: {
+        token,
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify(inputData)
+    }) as any
+
+    const fail = (message: string) => {
+      try {
+        source.close?.()
+      } catch {
+        // ignore
+      }
+      reject(new Error(message))
+    }
+
+    source.onmessage = function (data: any) {
+      let json = JSON.parse(data.data)
+      if (json.status == -1) {
+        fail(json.error || '生成大纲异常')
+        return
+      }
+      if (json.status == 4 && json.result) {
+        outlineTree.value = json.result
+      } else {
+        outline.value += json.text
+        outlineHtml.value = marked.parse(outline.value.replace('```markdown', '').replace(/```/g, '')) as string
+        nextTick(() => {
+          if (previewScroll.value) {
+            previewScroll.value.scrollTop = previewScroll.value.scrollHeight
+          }
+        })
+      }
+    }
+    source.onend = function (data: any) {
+      try {
+        source.close?.()
+      } catch {
+        // ignore
+      }
+      if (data.data.startsWith('{') && data.data.endsWith('}')) {
+        let json = JSON.parse(data.data)
+        if (json.code != 0) {
+          fail(json.message || '生成大纲异常')
+          return
+        }
+      }
+      genStatus.value = 2
+      resolve()
+    }
+    source.onerror = function (err: any) {
+      console.error('生成大纲异常', err)
+      fail('生成大纲异常')
+    }
+
+    source.stream()
+  })
+}
+
+async function generateOutline() {
   if (genStatus.value != 0) {
     return
   }
   genStatus.value = 1
   outlineHtml.value = '<h3>正在生成中，请稍后....</h3>'
+  outline.value = ''
+  outlineTree.value = undefined
   const inputData = {} as any
   if (selectType.value == 'subject') {
     // 根据主题
@@ -174,52 +244,34 @@ function generateOutline() {
   }
   genStatus.value = 1
   dataUrl.value = inputData.dataUrl
-  const url = 'https://ppt-master.yfw.me/api/public/ppt/generateOutline?apiKey=4u2Fo50Alk1ym2Os'
-  var source = new SSE(url, {
-    method: 'POST',
-    headers: {
-      'token': props.token,
-      'Cache-Control': 'no-cache',
-      'Content-Type': 'application/json'
-    },
-    payload: JSON.stringify(inputData),
-  }) as any
-  source.onmessage = function (data: any) {
-    let json = JSON.parse(data.data)
-    if (json.status == -1) {
-      alert('生成大纲异常：' + json.error)
-      genStatus.value = 0
-      return
-    }
-    if (json.status == 4 && json.result) {
-      outlineTree.value = json.result
-    } else {
-      outline.value += json.text
-      outlineHtml.value = marked.parse(outline.value.replace('```markdown', '').replace(/```/g, '')) as string
-      nextTick(() => {
-        if (previewScroll.value) {
-          previewScroll.value.scrollTop = previewScroll.value.scrollHeight
-        }
-      })
-    }
+
+  const runOnce = async (token: string) => {
+    outline.value = ''
+    outlineTree.value = undefined
+    outlineHtml.value = '<h3>正在生成中，请稍后....</h3>'
+    genStatus.value = 1
+    await streamGenerateOutline(inputData, token)
   }
-  source.onend = function (data: any) {
-    if (data.data.startsWith('{') && data.data.endsWith('}')) {
-      let json = JSON.parse(data.data)
-      if (json.code != 0) {
-        alert('生成大纲异常：' + json.message)
+
+  try {
+    await runOnce(props.token)
+  } catch (e: any) {
+    const message = e?.message || String(e)
+    if (message.includes(QUOTA_EXHAUSTED_MESSAGE) && props.refreshToken) {
+      try {
+        await props.refreshToken()
+        await runOnce(props.token)
+        return
+      } catch (e2: any) {
+        console.error('切换 Api-Key 后仍失败', e2)
+        alert('服务端暂时不可用')
         genStatus.value = 0
         return
       }
     }
-    genStatus.value = 2
-  }
-  source.onerror = function (err: any) {
-    console.error('生成大纲异常', err)
-    alert('生成大纲异常')
+    alert('生成大纲异常：' + message)
     genStatus.value = 0
   }
-  source.stream()
 }
 
 function updateOutline(md: any) {

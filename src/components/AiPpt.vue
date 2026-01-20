@@ -24,7 +24,8 @@
     </header>
 
     <main class="shell__main">
-      <GenerateOutline v-if="step === 1" :token="token" @nextStep="handleOutline" />
+      <div v-if="errorMessage" class="shell__error" role="alert">{{ errorMessage }}</div>
+      <GenerateOutline v-if="step === 1" :token="token" :refreshToken="refreshToken" @nextStep="handleOutline" />
       <SelectTemplate v-if="step === 2" :token="token" @nextStep="selectTemplate" />
       <GeneratePpt
         v-if="step === 3"
@@ -50,16 +51,35 @@ import GeneratePpt from './GeneratePpt.vue'
 
 // ppt-master
 
-// api key
-const apiKey = '4u2Fo50Alk1ym2Os'
+// Api-Key 支持多个：优先读取环境变量 `VITE_PPT_MASTER_API_KEYS`（逗号/空格分隔）
+
+const fallbackApiKeys = ['ak_sMHNt9r66EvFEmBrxM','ak_6_ItOWs3s6FF39o4L6','ak_rJIPyAsp356E6QvfBZ']
+// ak_F_2Pbc6653pE5Wv9WJ //github 0
+//ak_sMHNt9r66EvFEmBrxM  //horsic@gmail
+//ak_6_ItOWs3s6FF39o4L6 //hoaqq@gmail
+//ak_rJIPyAsp356E6QvfBZ // 0837
+const apiKeys = (() => {
+  const raw =
+    (import.meta as any).env?.VITE_PPT_MASTER_API_KEYS ||
+    (import.meta as any).env?.VITE_PPT_MASTER_API_KEY ||
+    ''
+  const parsed = String(raw)
+    .split(/[\s,]+/)
+    .map((k) => k.trim())
+    .filter(Boolean)
+  return parsed.length ? parsed : fallbackApiKeys
+})()
+
 // 用户ID（数据隔离）
 const uid = 'test'
 
 const step = ref(1)
 const outline = ref('')
-const dataUrl = ref()
+const dataUrl = ref('')
 const templateId = ref('')
 const token = ref(localStorage.getItem('token') || '')
+const errorMessage = ref('')
+const activeApiKeyIndex = ref(Number(localStorage.getItem('ppt_master_api_key_index') || '-1'))
 
 const steps = [
   { id: 1, label: '生成大纲' },
@@ -68,33 +88,50 @@ const steps = [
 ]
 
 // 这里只是demo演示，创建token请在服务端调用
-async function createApiToken() {
-  const url = 'https://ppt-master.yfw.me/api/public/user/createApiToken?apiKey=4u2Fo50Alk1ym2Os'
-  const resp = await (await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Api-Key': apiKey,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      uid,
-      limit: null
-    })
-  })).json()
-  if (resp.code != 0) {
-    // alert('创建接口token异常：' + resp.message)
-    return
+async function createApiTokenFrom(startIndex = 0) {
+  const url = 'https://ppt-master.yfw.me/api/user/createApiToken?t=10086'
+
+  let lastMessage = ''
+  for (let i = startIndex; i < apiKeys.length; i++) {
+    const apiKey = apiKeys[i]
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Api-Key': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          uid,
+          limit: null
+        })
+      })
+      const resp = await response.json()
+      if (resp?.code === 0 && resp?.data?.token) {
+        token.value = resp.data.token
+        errorMessage.value = ''
+        activeApiKeyIndex.value = i
+        localStorage.setItem('ppt_master_api_key_index', String(i))
+        return token.value
+      }
+      lastMessage = resp?.message || `key 失败：${apiKey}`
+    } catch (e: any) {
+      lastMessage = e?.message || String(e)
+    }
   }
-  token.value = resp.data.token
-  watchEffect(() => {
-    localStorage.setItem('token', token.value || '')
-  })
+
+  throw new Error(lastMessage || '服务端暂时不可用')
+}
+
+async function refreshToken() {
+  const startAt = activeApiKeyIndex.value >= 0 ? activeApiKeyIndex.value + 1 : 0
+  return await createApiTokenFrom(startAt)
 }
 
 function handleOutline(params: any) {
   step.value++
   outline.value = params.outline
-  dataUrl.value = params.dataUrl
+  dataUrl.value = params.dataUrl || ''
 }
 
 function selectTemplate(id: string) {
@@ -102,7 +139,15 @@ function selectTemplate(id: string) {
   templateId.value = id
 }
 
-createApiToken()
+watchEffect(() => {
+  localStorage.setItem('token', token.value || '')
+})
+
+  createApiTokenFrom(0).catch((e) => {
+    console.error('[createApiToken] failed:', e)
+    errorMessage.value = '服务端暂时不可用'
+  })
+
 </script>
 
 <style scoped>
@@ -219,6 +264,17 @@ createApiToken()
   display: flex;
   min-height: 0;
   overflow: hidden;
+}
+
+.shell__error {
+  width: 100%;
+  margin: 0 auto 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(229, 57, 53, 0.08);
+  border: 1px solid rgba(229, 57, 53, 0.2);
+  color: #b71c1c;
+  font-size: 13px;
 }
 
 .shell__footer {
